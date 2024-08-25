@@ -21,15 +21,20 @@ ball_rect = ball_img.get_rect()
 basket_rect = basket_img.get_rect()
 
 # Параметры мяча и корзины
+BALL_SPEED_CONSTANT = 15  # Константа силы броска
 ball_speed = [0, 0]
 ball_pos = [WIDTH // 2, HEIGHT - ball_rect.height // 2]
 is_ball_thrown = False
-basket_pos = [WIDTH // 2, HEIGHT // 4]
+basket_pos = [WIDTH // 2 - basket_rect.width // 2, HEIGHT // 4 + 10]  # Центрирование корзины и смещение вниз на 10 пикселей
 basket_speed = 5
 score = 0
 misses = 0
 basket_moving_right = True
 max_misses = 10
+
+# Определение границ кольца
+ring_top = basket_pos[1] + 100  # Верх кольца (80 пикселей от нижнего края)
+ring_bottom = ring_top + 20    # Нижняя граница кольца (примерное значение для высоты кольца)
 
 # Функция для отображения текста на экране
 def draw_text(text, font, color, surface, x, y):
@@ -49,8 +54,11 @@ while running:
 
         if event.type == pygame.MOUSEBUTTONDOWN and not is_ball_thrown:
             mouse_x, mouse_y = pygame.mouse.get_pos()
-            ball_speed[0] = (mouse_x - ball_pos[0]) / 10
-            ball_speed[1] = (mouse_y - ball_pos[1]) / 10
+            dx = mouse_x - ball_pos[0]
+            dy = mouse_y - ball_pos[1]
+            distance = math.hypot(dx, dy)
+            ball_speed[0] = (dx / distance) * BALL_SPEED_CONSTANT
+            ball_speed[1] = (dy / distance) * BALL_SPEED_CONSTANT
             is_ball_thrown = True
 
     # Обновление позиции мяча
@@ -58,12 +66,23 @@ while running:
         ball_pos[0] += ball_speed[0]
         ball_pos[1] += ball_speed[1]
 
+        # Проверка на столкновение с вертикальными границами экрана
+        if ball_pos[0] <= 0 or ball_pos[0] >= WIDTH:
+            ball_speed[0] = -ball_speed[0]
+
         # Проверка на столкновение с потолком
         if ball_pos[1] <= 0:
             ball_speed[1] = -ball_speed[1]  # Отскок от потолка
 
-        # Проверка на попадание в корзину
-        if basket_rect.collidepoint(ball_pos[0], ball_pos[1]):
+        # Проверка на попадание в нижнюю часть корзины (отскок)
+        if (basket_pos[0] < ball_pos[0] < basket_pos[0] + basket_rect.width and
+            ring_top < ball_pos[1] < ring_bottom):
+            ball_speed[1] = -ball_speed[1]  # Отскок от нижней части кольца
+
+        # Проверка на попадание в корзину сверху (засчитывание очка)
+        if (basket_pos[0] < ball_pos[0] < basket_pos[0] + basket_rect.width and
+            ball_pos[1] < ring_top and
+            ball_speed[1] < 0):  # Мяч должен двигаться вверх
             score += 1
             is_ball_thrown = False
             ball_pos = [WIDTH // 2, HEIGHT - ball_rect.height // 2]
@@ -92,9 +111,10 @@ while running:
     screen.blit(basket_img, basket_rect)
     screen.blit(ball_img, (ball_pos[0] - ball_rect.width // 2, ball_pos[1] - ball_rect.height // 2))
 
-    # Отображение счета
+    # Отображение счета и промахов
     font = pygame.font.Font(None, 36)
-    draw_text(f"Score: {score}", font, (0, 0, 0), screen, WIDTH // 2, 50)
+    draw_text(f"Score: {score}", font, (0, 0, 0), screen, WIDTH // 2 - 100, 50)
+    draw_text(f"Misses: {misses}", font, (0, 0, 0), screen, WIDTH // 2 + 100, 50)
 
     # Проверка на окончание игры
     if misses >= max_misses:
